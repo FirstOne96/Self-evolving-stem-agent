@@ -1,15 +1,15 @@
 # main.py
 #
-# Entry point — run this with: python main.py
+# Entry point — run with: python main.py
 #
-# This is the full stem agent loop:
-#   Phase 1: Researcher  — figures out how QA agents are built
-#   Phase 2: Designer    — writes its own system prompt and strategy
-#   Phase 3: Builder     — instantiates both agents, runs the benchmark
-#   Phase 4: Evaluator   — decides to stop or loop back with feedback
+# Runs the full stem agent evolution loop:
+#   Phase 1: Researcher  — figures out how QA agents are typically built
+#   Phase 2: Designer    — writes its own system prompt based on that research
+#   Phase 3: Builder     — runs both the generic and specialized agent on the benchmark
+#   Phase 4: Evaluator   — decides to stop or loop back with feedback on what failed
 #
-# At the end, logs/evolution.json contains every decision made,
-# and the terminal shows the before/after score comparison.
+# Everything gets logged to logs/evolution.json so you can see every decision the
+# stem agent made across all rounds. That's also the file to attach to the write-up.
 
 import json
 import os
@@ -21,7 +21,7 @@ from stem.designer   import run_designer
 from stem.builder    import run_builder
 from stem.evaluator  import run_evaluator
 
-DOMAIN = "QA / Bug Finding"
+DOMAIN   = "QA / Bug Finding"
 LOG_PATH = "logs/evolution.json"
 
 
@@ -42,12 +42,12 @@ def main():
         "final":      None,
     }
 
-    # ── Phase 1: Research (done once — domain doesn't change) ──────────
+    # research happens once — the domain doesn't change between rounds
     domain_map = run_researcher(DOMAIN)
     with open("logs/domain_map.json", "w") as f:
         json.dump(domain_map, f, indent=2)
 
-    # State carried across rounds
+    # these get updated after each round and passed to the Designer on the next one
     previous_score    = None
     previous_prompt   = None
     previous_failures = None
@@ -55,13 +55,11 @@ def main():
     best_build_result = None
     best_score        = 0.0
 
-    # ── Evolution loop ──────────────────────────────────────────────────
     for round_num in range(1, MAX_EVOLUTION_ROUNDS + 1):
         print(f"\n{'─'*60}")
         print(f"  ROUND {round_num}")
         print(f"{'─'*60}")
 
-        # Phase 2: Design
         spec = run_designer(
             domain_map=domain_map,
             previous_score=previous_score,
@@ -71,17 +69,15 @@ def main():
         with open(f"logs/agent_spec_round{round_num}.json", "w") as f:
             json.dump(spec, f, indent=2)
 
-        # Phase 3: Build + score
         build_result = run_builder(spec)
 
-        # Phase 4: Evaluate
         eval_result = run_evaluator(
             build_result=build_result,
             round_number=round_num,
             max_rounds=MAX_EVOLUTION_ROUNDS,
         )
 
-        # Log this round
+        # log everything about this round so we can trace the evolution later
         round_log = {
             "round":              round_num,
             "architecture":       spec.get("architecture"),
@@ -97,12 +93,11 @@ def main():
         }
         evolution_log["rounds"].append(round_log)
 
-        # Track best result across all rounds
         if eval_result["score"] > best_score:
             best_score        = eval_result["score"]
             best_build_result = build_result
 
-        # Update state for next round (if looping)
+        # pass failure info to the Designer for the next round (if there is one)
         previous_score    = eval_result["score"]
         previous_prompt   = spec.get("system_prompt")
         previous_failures = eval_result["failed_bugs"]
@@ -110,7 +105,6 @@ def main():
         if eval_result["decision"] == "STOP":
             break
 
-    # ── Final summary ───────────────────────────────────────────────────
     baseline_score = best_build_result["baseline_result"]["score"]
     final_score    = best_score
     delta          = final_score - baseline_score
@@ -118,11 +112,11 @@ def main():
     rounds_taken   = len(evolution_log["rounds"])
 
     evolution_log["final"] = {
-        "rounds_taken":    rounds_taken,
-        "baseline_score":  baseline_score,
-        "final_score":     final_score,
-        "improvement":     delta,
-        "completed_at":    datetime.now().isoformat(),
+        "rounds_taken":   rounds_taken,
+        "baseline_score": baseline_score,
+        "final_score":    final_score,
+        "improvement":    delta,
+        "completed_at":   datetime.now().isoformat(),
     }
 
     with open(LOG_PATH, "w") as f:

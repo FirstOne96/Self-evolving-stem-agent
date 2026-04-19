@@ -1,10 +1,15 @@
 # eval/ground_truth.py
-# 20 bugs total: 01-15 (single-function) + a-e (multi-function/runtime)
-# Each has: description, exact_fault (the precise expression that is wrong),
-# and keywords for fallback keyword scoring.
+#
+# Answer key for all 20 bugs in the benchmark.
+# Each entry has three fields:
+#   description — plain English of what the bug is
+#   exact_fault — the specific expression that is wrong (used by the judge for precision scoring)
+#   keywords    — fallback list if you ever want simple keyword matching instead of LLM judge
 
 GROUND_TRUTH = {
-    # ── Single-function bugs (01-15) ────────────────────────────────────
+    # --- single-function bugs (01-15) ---
+    # these are more classic Python pitfalls, mostly catchable by pattern recognition
+
     "bug_01": {
         "description": "Loop starts at index 1 instead of 0, skipping the first element",
         "exact_fault": "range(1, len(nums)) — should be range(0, len(nums)) or range(len(nums))",
@@ -81,7 +86,10 @@ GROUND_TRUTH = {
         "keywords": ["low = mid", "mid + 1", "infinite loop", "never advances", "should be mid + 1"]
     },
 
-    # ── Multi-function / runtime bugs (a-e) ─────────────────────────────
+    # --- multi-function / runtime bugs (a-e) ---
+    # these require understanding how functions interact or knowing Python runtime behavior.
+    # a generic prompt tends to get the area right but miss the exact expression.
+
     "bug_a": {
         "description": "DEFAULT_ITEM is a module-level dict mutated every call — all cart items point to the same object",
         "exact_fault": "item = DEFAULT_ITEM reuses the same dict object — should be item = DEFAULT_ITEM.copy() or item = {}",

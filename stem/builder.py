@@ -1,28 +1,24 @@
 # stem/builder.py
 #
-# The Builder is Phase 3 of the stem loop.
-# It takes the agent spec from the Designer and instantiates
-# two agents: the generic baseline and the specialized agent.
-# It also runs both against the benchmark so we get before/after scores.
+# Phase 3 of the stem loop.
+# Takes the agent spec from the Designer, creates both agents,
+# runs them on the benchmark, and returns the results.
+# The baseline (generic) run and the specialized run happen here
+# so we can compare them directly in the same round.
 
-import json
 from agents.base_agent import GenericAgent, SpecializedAgent
-from eval.strict_benchmark import run_strict_benchmark as run_benchmark
+from eval.benchmark import run_benchmark
 
 
-def run_builder(spec: dict, verbose: bool = True) -> dict:
+def run_builder(spec, verbose=True):
     """
     Instantiate both agents from the spec and run them on the benchmark.
 
-    Args:
-        spec:    Output from run_designer()
-        verbose: Whether to print progress
+    The generic agent always uses the same vague prompt — it's our baseline.
+    The specialized agent uses the system prompt the Designer just wrote.
+    Running both in the same round means the only variable is the system prompt.
 
-    Returns a dict with:
-        generic_agent:     the unspecialized agent instance
-        specialized_agent: the specialized agent instance
-        baseline_result:   benchmark result for the generic agent
-        specialized_result: benchmark result for the specialized agent
+    Returns a dict with the two agent instances and their benchmark results.
     """
     if verbose:
         print(f"\n[Builder] Instantiating agents...")
@@ -32,23 +28,15 @@ def run_builder(spec: dict, verbose: bool = True) -> dict:
     generic_agent     = GenericAgent()
     specialized_agent = SpecializedAgent(spec)
 
-    # --- Baseline run (before specialization) ---
     if verbose:
         print(f"\n[Builder] Running BASELINE agent on benchmark...")
 
-    baseline_result = run_benchmark(
-        agent_fn=generic_agent.run,
-        verbose=verbose,
-    )
+    baseline_result = run_benchmark(agent_fn=generic_agent.run, verbose=verbose)
 
-    # --- Specialized run (after specialization) ---
     if verbose:
         print(f"\n[Builder] Running SPECIALIZED agent on benchmark...")
 
-    specialized_result = run_benchmark(
-        agent_fn=specialized_agent.run,
-        verbose=verbose,
-    )
+    specialized_result = run_benchmark(agent_fn=specialized_agent.run, verbose=verbose)
 
     if verbose:
         delta = specialized_result["score"] - baseline_result["score"]

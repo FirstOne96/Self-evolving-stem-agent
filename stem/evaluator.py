@@ -1,25 +1,48 @@
 # stem/evaluator.py
+#
+# Phase 4 of the stem loop.
+# Looks at the benchmark results and decides: stop or loop?
+# If the score meets the threshold, we're done.
+# If not, we collect which bugs were vague or wrong and pass that
+# back to the Designer so it can adjust the system prompt for those specifically.
+#
+# We track vague and wrong separately because they need different fixes:
+#   vague = agent understood the bug but didn't name the exact expression
+#   wrong = agent completely missed the bug
+# The Designer uses this distinction to know what to change.
+
 from config import SUCCESS_THRESHOLD
 
 
 def run_evaluator(build_result, round_number, max_rounds, verbose=True):
+    """
+    Decide whether to stop evolving or loop back for another round.
+
+    Reads the specialized agent's results and checks:
+    - does the score meet the threshold?
+    - have we hit the max rounds limit?
+    - if neither, what specifically went wrong?
+
+    Returns a dict with the decision and all the details needed for the next round.
+    """
     specialized = build_result["specialized_result"]
     baseline    = build_result["baseline_result"]
     score       = specialized["score"]
     base_score  = baseline["score"]
 
-    # Bugs where agent was correct but vague (precision=0) — Designer's target
+    # bugs where the agent was right about what the bug was, but didn't name the exact line
     vague_bugs = [
         r["bug_id"] for r in specialized["results"]
         if r.get("correctness") == 1 and r.get("precision") == 0
     ]
-    # Bugs where agent was just wrong
+
+    # bugs where the agent was just wrong
     wrong_bugs = [
         r["bug_id"] for r in specialized["results"]
         if r.get("correctness") == 0
     ]
-    failed_bugs = vague_bugs + wrong_bugs
 
+    failed_bugs     = vague_bugs + wrong_bugs
     missed_patterns = _summarize_failures(specialized["results"])
 
     if verbose:
@@ -35,7 +58,7 @@ def run_evaluator(build_result, round_number, max_rounds, verbose=True):
         loop_reason = None
     elif round_number >= max_rounds:
         decision    = "STOP"
-        stop_reason = f"Reached max rounds ({max_rounds}) — best score {score:.0%}"
+        stop_reason = f"Reached max rounds ({max_rounds}) — best score was {score:.0%}"
         loop_reason = None
     else:
         decision    = "LOOP"
@@ -64,18 +87,22 @@ def run_evaluator(build_result, round_number, max_rounds, verbose=True):
 
 
 def _summarize_failures(results):
+    """
+    Build a plain-English summary of what the agent got wrong or vague.
+    This gets passed back to the Designer so it knows what to improve.
+    """
     lines = []
     for r in results:
         c = r.get("correctness", 0)
         p = r.get("precision",   0)
         if c == 1 and p == 0:
             lines.append(
-                f"{r['bug_id']}: correct but vague — agent said "
+                f"{r['bug_id']}: correct but vague — said "
                 f"'{r['agent_answer'][:60]}' but needed to name '{r['exact_fault'][:60]}'"
             )
         elif c == 0:
             lines.append(
-                f"{r['bug_id']}: wrong — agent said '{r['agent_answer'][:60]}' "
+                f"{r['bug_id']}: wrong — said '{r['agent_answer'][:60]}' "
                 f"expected '{r['expected_description'][:60]}'"
             )
     return " | ".join(lines) if lines else "none"

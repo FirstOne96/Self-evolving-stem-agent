@@ -1,15 +1,16 @@
 # stem/researcher.py
 #
-# The Researcher is Phase 1 of the stem loop.
-# It takes a domain name and asks GPT-4o to produce a structured
-# "domain map" — a synthesis of how that class of problems is typically solved.
+# Phase 1 of the stem loop.
+# Takes a domain name and asks GPT-4o to produce a structured "domain map" —
+# basically a summary of how agents for that domain are typically built.
+# The map covers tools, architectures, prompt patterns, and failure modes.
+# This runs once at the start and the result gets passed to the Designer.
 
 import json
 from openai import OpenAI
-from config import OPENAI_API_KEY, MODEL
+from config import OPENAI_API_KEY, JUDGE_MODEL
 
 client = OpenAI(api_key=OPENAI_API_KEY)
-
 
 RESEARCHER_SYSTEM_PROMPT = """You are an expert AI systems researcher.
 Your job is to analyze a problem domain and produce a structured map of 
@@ -41,7 +42,6 @@ Your JSON must follow this exact structure:
   }
 }"""
 
-
 RESEARCHER_USER_PROMPT = """Research the following AI agent domain and produce a domain map:
 
 Domain: {domain}
@@ -56,22 +56,19 @@ Focus specifically on:
 Be concrete and specific. Your output will be used to automatically configure an AI agent."""
 
 
-def run_researcher(domain: str, verbose: bool = True) -> dict:
+def run_researcher(domain, verbose=True):
     """
-    Research a domain and return a structured domain map.
+    Ask GPT-4o to research the domain and return a domain map as a dict.
 
-    Args:
-        domain:  The problem domain (e.g. "QA / Bug Finding")
-        verbose: Whether to print progress
-
-    Returns:
-        A dict containing the domain map
+    The domain map is used by the Designer to decide what kind of agent to build.
+    It includes tools, architectures, prompt patterns, and known failure modes.
+    If the model wraps its response in markdown fences we strip those out.
     """
     if verbose:
         print(f"\n[Researcher] Researching domain: '{domain}'...")
 
     response = client.chat.completions.create(
-        model=MODEL,
+        model=JUDGE_MODEL,
         messages=[
             {"role": "system", "content": RESEARCHER_SYSTEM_PROMPT},
             {"role": "user",   "content": RESEARCHER_USER_PROMPT.format(domain=domain)},
@@ -82,10 +79,10 @@ def run_researcher(domain: str, verbose: bool = True) -> dict:
 
     raw = response.choices[0].message.content.strip()
 
-    # Parse JSON — strip accidental markdown fences if present
     try:
         domain_map = json.loads(raw)
     except json.JSONDecodeError as e:
+        # sometimes the model wraps json in ```json ... ``` even when told not to
         if "```" in raw:
             raw = raw.split("```")[1]
             if raw.startswith("json"):

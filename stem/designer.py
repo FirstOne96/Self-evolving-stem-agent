@@ -1,7 +1,18 @@
 # stem/designer.py
+#
+# Phase 2 of the stem loop.
+# Reads the domain map from the Researcher and writes a concrete agent spec:
+# a system prompt, architecture choice, reasoning strategy, and tool list.
+# The key thing it produces is a system prompt that forces precise bug identification
+# rather than vague descriptions — that's what closes the scoring gap.
+#
+# On the first round it only has the domain map to work with.
+# On subsequent rounds it also gets the list of bugs that were vague last time,
+# so it can adjust the system prompt specifically for those.
+
 import json
 from openai import OpenAI
-from config import OPENAI_API_KEY, JUDGE_MODEL as MODEL
+from config import OPENAI_API_KEY, JUDGE_MODEL
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -54,13 +65,22 @@ target the bugs that were vague or wrong last time."""
 
 def run_designer(domain_map, previous_score=None, previous_prompt=None,
                  previous_failures=None, verbose=True):
+    """
+    Generate an agent spec from the domain map.
+
+    On the first call previous_score/prompt/failures are all None.
+    On retry rounds they contain what went wrong last time so the
+    Designer can adjust its system prompt specifically for those bugs.
+
+    Returns a dict with: system_prompt, architecture, strategy, tools, reasoning.
+    """
     if verbose:
         print(f"\n[Designer] Designing agent for domain: '{domain_map.get('domain')}'...")
         if previous_score is not None:
             print(f"[Designer] Previous score {previous_score:.0%} — targeting precision gap...")
 
     response = client.chat.completions.create(
-        model=MODEL,
+        model=JUDGE_MODEL,
         messages=[
             {"role": "system", "content": DESIGNER_SYSTEM_PROMPT},
             {"role": "user",   "content": DESIGNER_USER_PROMPT.format(
@@ -80,7 +100,8 @@ def run_designer(domain_map, previous_score=None, previous_prompt=None,
     except json.JSONDecodeError:
         if "```" in raw:
             raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
+            if raw.startswith("json"):
+                raw = raw[4:]
             spec = json.loads(raw.strip())
         else:
             raise ValueError(f"Designer returned invalid JSON:\n{raw}")
@@ -89,7 +110,7 @@ def run_designer(domain_map, previous_score=None, previous_prompt=None,
         print(f"[Designer] Done.")
         print(f"  - Architecture: {spec.get('architecture')}")
         print(f"  - Tools: {spec.get('tools')}")
-        print(f"  - Prompt length: {len(spec.get('system_prompt',''))} chars")
-        print(f"  - Reasoning: {spec.get('reasoning','')[:100]}...")
+        print(f"  - Prompt length: {len(spec.get('system_prompt', ''))} chars")
+        print(f"  - Reasoning: {spec.get('reasoning', '')[:100]}...")
 
     return spec
