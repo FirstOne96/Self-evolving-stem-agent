@@ -3,34 +3,31 @@ from config import SUCCESS_THRESHOLD
 
 
 def run_evaluator(build_result, round_number, max_rounds, verbose=True):
-    specialized_result = build_result["specialized_result"]
-    baseline_result    = build_result["baseline_result"]
-    score              = specialized_result["score"]
-    baseline_score     = baseline_result["score"]
+    specialized = build_result["specialized_result"]
+    baseline    = build_result["baseline_result"]
+    score       = specialized["score"]
+    base_score  = baseline["score"]
 
-    # Works with BOTH benchmark formats:
-    # - keyword benchmark: results have "correct" (bool)
-    # - strict benchmark:  results have "points" (0/1/2)
-    def is_failed(r):
-        if "correct" in r:
-            return not r["correct"]
-        if "points" in r:
-            return r["points"] < 2  # 0 or 1 = not fully correct
-        return False
-
-    failed_bugs = [
-        r["bug_id"]
-        for r in specialized_result["results"]
-        if is_failed(r)
+    # Bugs where agent was correct but vague (precision=0) — Designer's target
+    vague_bugs = [
+        r["bug_id"] for r in specialized["results"]
+        if r.get("correctness") == 1 and r.get("precision") == 0
     ]
+    # Bugs where agent was just wrong
+    wrong_bugs = [
+        r["bug_id"] for r in specialized["results"]
+        if r.get("correctness") == 0
+    ]
+    failed_bugs = vague_bugs + wrong_bugs
 
-    missed_patterns = _summarize_failures(specialized_result["results"])
+    missed_patterns = _summarize_failures(specialized["results"])
 
     if verbose:
         print(f"\n[Evaluator] Round {round_number}/{max_rounds}")
         print(f"  Score     : {score:.0%}  (threshold: {SUCCESS_THRESHOLD:.0%})")
-        print(f"  Baseline  : {baseline_score:.0%}")
-        print(f"  Failed    : {failed_bugs if failed_bugs else 'none'}")
+        print(f"  Baseline  : {base_score:.0%}")
+        print(f"  Vague     : {vague_bugs if vague_bugs else 'none'}  (correct but imprecise)")
+        print(f"  Wrong     : {wrong_bugs if wrong_bugs else 'none'}")
 
     if score >= SUCCESS_THRESHOLD:
         decision    = "STOP"
@@ -45,17 +42,21 @@ def run_evaluator(build_result, round_number, max_rounds, verbose=True):
         stop_reason = None
         loop_reason = (
             f"Score {score:.0%} below threshold {SUCCESS_THRESHOLD:.0%}. "
-            f"Still missing: {', '.join(failed_bugs)}. Pattern: {missed_patterns}"
+            f"Vague (correct but imprecise): {vague_bugs}. "
+            f"Wrong: {wrong_bugs}. "
+            f"Pattern: {missed_patterns}"
         )
 
     if verbose:
-        print(f"  Decision  : {decision} — {stop_reason or loop_reason}")
+        print(f"  Decision  : {decision} — {stop_reason or loop_reason[:80]}")
 
     return {
         "decision":        decision,
         "score":           score,
-        "baseline_score":  baseline_score,
+        "baseline_score":  base_score,
         "failed_bugs":     failed_bugs,
+        "vague_bugs":      vague_bugs,
+        "wrong_bugs":      wrong_bugs,
         "stop_reason":     stop_reason,
         "loop_reason":     loop_reason,
         "missed_patterns": missed_patterns,
@@ -63,18 +64,18 @@ def run_evaluator(build_result, round_number, max_rounds, verbose=True):
 
 
 def _summarize_failures(results):
-    def is_failed(r):
-        if "correct" in r:   return not r["correct"]
-        if "points"  in r:   return r["points"] < 2
-        return False
-
-    failed = [r for r in results if is_failed(r)]
-    if not failed:
-        return "none"
     lines = []
-    for r in failed:
-        lines.append(
-            f"{r['bug_id']}: agent said '{r['agent_answer'][:80]}' "
-            f"but expected '{r['expected_description']}'"
-        )
-    return " | ".join(lines)
+    for r in results:
+        c = r.get("correctness", 0)
+        p = r.get("precision",   0)
+        if c == 1 and p == 0:
+            lines.append(
+                f"{r['bug_id']}: correct but vague — agent said "
+                f"'{r['agent_answer'][:60]}' but needed to name '{r['exact_fault'][:60]}'"
+            )
+        elif c == 0:
+            lines.append(
+                f"{r['bug_id']}: wrong — agent said '{r['agent_answer'][:60]}' "
+                f"expected '{r['expected_description'][:60]}'"
+            )
+    return " | ".join(lines) if lines else "none"

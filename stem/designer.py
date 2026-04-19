@@ -6,38 +6,50 @@ from config import OPENAI_API_KEY, JUDGE_MODEL as MODEL
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 DESIGNER_SYSTEM_PROMPT = """You are an AI agent architect.
-You receive a domain research map and design a concrete agent configuration.
+You receive a domain research map and design a system prompt for a bug-finding agent.
 
-You must respond with valid JSON only. No markdown, no explanation outside the JSON.
+Respond with valid JSON only. No markdown outside the JSON.
 
 {
-  "system_prompt": "<complete system prompt the specialized agent will use>",
-  "architecture": "<chosen architecture name>",
-  "strategy": "<step-by-step instructions the agent follows per problem>",
-  "tools": ["<tool1>", "<tool2>"],
-  "reasoning": "<why these choices, referencing the research>"
+  "system_prompt": "<the complete system prompt>",
+  "architecture": "<architecture name>",
+  "strategy": "<per-problem reasoning steps>",
+  "tools": ["<tool1>"],
+  "reasoning": "<why these choices, referencing research>"
 }
 
-CRITICAL rules for the system_prompt you write:
-- The agent receives one Python code snippet and must describe the bug already present in it
-- The agent must NOT generate test cases, test plans, or refactoring suggestions
-- The agent must identify: the specific wrong line/expression, why it fails, what it should be
-- The system prompt must directly address the failure modes from the research
-- Keep the response focused on bug identification, not QA process"""
+The agent receives a Python code snippet and must identify the one bug in it.
+The agent is scored on TWO dimensions:
+  1. CORRECTNESS — did it identify the right bug?
+  2. PRECISION    — did it name the exact wrong expression or line?
 
-DESIGNER_USER_PROMPT = """Based on this domain research, design a specialized bug-finding agent.
+The generic baseline scores poorly on PRECISION because it describes bugs vaguely
+("the loop is wrong") without naming the exact expression ("range(1, len(nums))").
 
-DOMAIN MAP:
+Your system prompt must force the agent to:
+  - Trace through the code line by line before concluding
+  - Name the exact expression, variable, or line that is wrong
+  - Explain specifically why that expression fails
+  - State what the expression should be instead
+
+Do NOT tell the agent to generate test cases, write QA reports, or suggest refactors."""
+
+DESIGNER_USER_PROMPT = """Design a system prompt for a Python bug-finding agent.
+
+DOMAIN RESEARCH:
 {domain_map}
 
-Previous attempt score (if any): {previous_score}
-Previous system prompt (if any): {previous_prompt}
-What failed last time (if any): {previous_failures}
+Previous score: {previous_score}
+Previous system prompt: {previous_prompt}
+Bugs where precision was low (correct area, vague explanation): {previous_failures}
 
-The agent's ONLY job: given a Python function, identify the one bug in it.
-Output must be a bug description — not test cases, not a QA process, not refactoring advice.
+The scoring gap between generic and specialized agents comes from PRECISION.
+The generic agent says "the condition is inverted" — scores 1/2.
+The specialized agent says "n <= 0 should be n > 0" — scores 2/2.
 
-If there was a previous attempt, make meaningful changes targeting what failed specifically."""
+Design a system prompt that forces precise, expression-level identification of bugs.
+If there was a previous attempt, change the reasoning strategy specifically to
+target the bugs that were vague or wrong last time."""
 
 
 def run_designer(domain_map, previous_score=None, previous_prompt=None,
@@ -45,7 +57,7 @@ def run_designer(domain_map, previous_score=None, previous_prompt=None,
     if verbose:
         print(f"\n[Designer] Designing agent for domain: '{domain_map.get('domain')}'...")
         if previous_score is not None:
-            print(f"[Designer] Previous score was {previous_score:.0%} — improving...")
+            print(f"[Designer] Previous score {previous_score:.0%} — targeting precision gap...")
 
     response = client.chat.completions.create(
         model=MODEL,
@@ -76,8 +88,8 @@ def run_designer(domain_map, previous_score=None, previous_prompt=None,
     if verbose:
         print(f"[Designer] Done.")
         print(f"  - Architecture: {spec.get('architecture')}")
-        print(f"  - Tools selected: {spec.get('tools')}")
-        print(f"  - System prompt length: {len(spec.get('system_prompt',''))} chars")
+        print(f"  - Tools: {spec.get('tools')}")
+        print(f"  - Prompt length: {len(spec.get('system_prompt',''))} chars")
         print(f"  - Reasoning: {spec.get('reasoning','')[:100]}...")
 
     return spec
