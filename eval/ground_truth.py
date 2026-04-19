@@ -45,4 +45,24 @@ GROUND_TRUTH = {
         "description": "Dictionary key is 'Age' (capital A) but actual key is 'age' (lowercase)",
         "keywords": ["Age", "age", "lowercase", "capital", "case", "wrong key", "key mismatch"]
     },
+    "bug_11": {
+        "description": "Loop uses i-1 as index — when i=0, i-1 is -1 which reads the last element first, corrupting the sum",
+        "keywords": ["i - 1", "i-1", "-1", "last element", "index -1", "off by one", "wrong index", "when i is 0"]
+    },
+    "bug_12": {
+        "description": "Index s[len(s) - i] is off by one — should be s[len(s) - i - 1], causes wrong comparison or IndexError",
+        "keywords": ["len(s) - i", "off by one", "index", "should be len(s) - i - 1", "IndexError", "wrong index"]
+    },
+    "bug_13": {
+        "description": "result.append(item) is outside the if block — appends every item including duplicates",
+        "keywords": ["outside", "indentation", "inside the if", "every item", "always appends", "should be indented", "result.append"]
+    },
+    "bug_14": {
+        "description": "counts[word] = 1 in the else branch resets the count instead of incrementing it",
+        "keywords": ["= 1", "should be +=", "resets", "increment", "+= 1", "always sets to 1", "counts[word]"]
+    },
+    "bug_15": {
+        "description": "low = mid should be low = mid + 1 — never advances the lower bound, causing infinite loop",
+        "keywords": ["low = mid", "mid + 1", "infinite loop", "never advances", "should be mid + 1", "low bound", "binary search"]
+    },
 }

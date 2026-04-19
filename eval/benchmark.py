@@ -9,7 +9,7 @@
 # and must return a plain-English description of the bug.
 
 import os
-from eval.ground_truth import GROUND_TRUTH
+from eval.ground_truth2 import GROUND_TRUTH
 
 BUGS_DIR = os.path.join(os.path.dirname(__file__), "bugs")
 
