@@ -1,4 +1,7 @@
-# Stem Agent
+![Python](https://img.shields.io/badge/python-3.10-blue.svg)
+![OpenAI](https://img.shields.io/badge/OpenAI-API-black.svg)
+
+# 🧬 Stem Agent
 
 A self-specializing AI agent for QA / Bug Finding.
 
@@ -6,7 +9,7 @@ Given a domain name, the system researches how agents in that domain are typical
 
 ---
 
-## Setup
+## 🛠️ Setup
 
 **Requirements**
 
@@ -37,7 +40,7 @@ Results are printed to the terminal and saved to `logs/evolution.json`.
 
 ---
 
-## Project structure
+## 🧱 Project structure
 
 ```
 stem-agent/
@@ -61,7 +64,7 @@ stem-agent/
 
 ---
 
-## How it works
+## 🧠 How it works
 
 The system runs a four-phase loop, inspired by how a stem cell specializes — it starts generic and grows into something specific by reading signals from its environment.
 
@@ -98,7 +101,7 @@ logs/evolution.json
 
 ---
 
-## Benchmark
+## 🧩 Benchmark
 
 The benchmark is 20 Python functions, each with exactly one bug. Bugs are split into two tiers:
 
@@ -131,7 +134,7 @@ The two-axis design is the key decision. A generic prompt reliably scores 1/2 �
 
 ---
 
-## Results
+## 📊 Results
 
 | Agent | Score | Full (2/2) | Vague (1/2) | Wrong (0/2) |
 |-------|-------|-----------|------------|------------|
@@ -143,7 +146,7 @@ The loop ran one round and stopped. Every point of improvement came from the pre
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 All settings are in `config.py`:
 
@@ -159,7 +162,7 @@ The model split is intentional. `gpt-4o-mini` has a genuine precision gap on vag
 
 ---
 
-## Logs
+## 🗂️ Logs
 
 After each run, `logs/` contains:
 
@@ -169,3 +172,5 @@ After each run, `logs/` contains:
 
 ---
 
+## 📞 Contact:
+Andrii Kozlov - andrijkozlov96@gmail.com  | https://t.me/AndrewKozz | https://www.linkedin.com/in/andrii-kozlov96<br>
