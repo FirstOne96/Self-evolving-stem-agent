@@ -19,7 +19,7 @@ Given a domain name, the system researches how agents in that domain are typical
 **Install dependencies**
 
 ```bash
-pip install openai python-dotenv
+pip install requirements.txt
 ```
 
 **Add your API key**
